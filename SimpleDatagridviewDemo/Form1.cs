@@ -29,17 +29,6 @@ namespace SimpleDatagridviewDemo
 
         }
 
-        //// double buffer the datagridview to prevent flickering
-        //protected override CreateParams CreateParams
-        //{
-        //    get
-        //    {
-        //        CreateParams cp = base.CreateParams;
-        //        cp.ExStyle |= 0x02000000; // WS_EX_COMPOSITED
-        //        return cp;
-        //    }
-        //}
-
         private void LoadJsonData()
         {
             string json = @"
@@ -84,6 +73,7 @@ namespace SimpleDatagridviewDemo
             }
 
             dataGridView1.EditingControlShowing += DataGridView1_EditingControlShowing;
+            dataGridView1.CellEnter += DataGridView1_CellEnter; // Opens dropdown on click
             dataGridView1.DataError += DataGridView1_DataError; // Handle errors
         }
 
@@ -105,6 +95,19 @@ namespace SimpleDatagridviewDemo
 
                 // Optionally, handle selection changes
                 comboBox.SelectedIndexChanged += ComboBox_SelectedIndexChanged;
+            }
+        }
+
+        private void DataGridView1_CellEnter(object sender, DataGridViewCellEventArgs e)
+        {
+            // If entering a ComboBox cell, enter edit mode to show the dropdown immediately
+            if (e.ColumnIndex == 1)
+            {
+                dataGridView1.BeginEdit(true);
+                if (dataGridView1.EditingControl is ComboBox comboBox)
+                {
+                    comboBox.DroppedDown = true; // Open the dropdown instantly
+                }
             }
         }
 
