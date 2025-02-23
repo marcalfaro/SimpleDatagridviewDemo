@@ -43,88 +43,141 @@ namespace SimpleDatagridviewDemo
 
         private void InitializeDataGridView()
         {
-            dataGridView1.ColumnCount = 1; // Create first column
-            dataGridView1.Columns[0].HeaderText = "Row Index"; // First column for row identification
+            dataGridView1.ColumnCount = 1;
+            dataGridView1.Columns[0].HeaderText = "Row Index";
 
-            // Create and add ComboBox column
+            // Create ComboBox column
             DataGridViewComboBoxColumn comboColumn = new DataGridViewComboBoxColumn
             {
                 HeaderText = "Select Item",
                 Name = "ComboBoxColumn"
             };
-            dataGridView1.Columns.Add(comboColumn); // Add as the second column
+            dataGridView1.Columns.Add(comboColumn);
 
-            dataGridView1.RowCount = 3; // 3 rows
+            dataGridView1.RowCount = 3;
 
-            // Populate first column with row numbers (for clarity)
             for (int i = 0; i < dataGridView1.Rows.Count; i++)
             {
                 dataGridView1.Rows[i].Cells[0].Value = $"Row {i + 1}";
 
-                // Assign dropdown items per row
                 if (rowData.ContainsKey(i))
                 {
                     var comboBoxCell = (DataGridViewComboBoxCell)dataGridView1.Rows[i].Cells[1];
                     comboBoxCell.Items.AddRange(rowData[i].ToArray());
-
-                    // Set default value to avoid "value is not valid" error
-                    comboBoxCell.Value = rowData[i][0];
+                    comboBoxCell.Value = rowData[i][0]; // Set default value
                 }
             }
 
             dataGridView1.EditingControlShowing += DataGridView1_EditingControlShowing;
-            dataGridView1.CellEnter += DataGridView1_CellEnter; // Opens dropdown on click
-            dataGridView1.DataError += DataGridView1_DataError; // Handle errors
+            dataGridView1.CellValidating += DataGridView1_CellValidating;
+            dataGridView1.CellEnter += DataGridView1_CellEnter;
+            dataGridView1.DataError += DataGridView1_DataError;
         }
+
+        //private void DataGridView1_EditingControlShowing(object sender, DataGridViewEditingControlShowingEventArgs e)
+        //{
+        //    if (dataGridView1.CurrentCell.ColumnIndex == 1 && e.Control is ComboBox comboBox)
+        //    {
+        //        int rowIndex = dataGridView1.CurrentCell.RowIndex;
+        //        comboBox.DropDownStyle = ComboBoxStyle.DropDown; // Allow text input
+        //        comboBox.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
+        //        comboBox.AutoCompleteSource = AutoCompleteSource.ListItems;
+
+        //        comboBox.Items.Clear();
+        //        if (rowData.ContainsKey(rowIndex))
+        //        {
+        //            comboBox.Items.AddRange(rowData[rowIndex].ToArray());
+        //        }
+        //    }
+        //}
 
         private void DataGridView1_EditingControlShowing(object sender, DataGridViewEditingControlShowingEventArgs e)
         {
             if (dataGridView1.CurrentCell.ColumnIndex == 1 && e.Control is ComboBox comboBox)
             {
-                int rowIndex = dataGridView1.CurrentCell.RowIndex;
+                comboBox.DropDownStyle = ComboBoxStyle.DropDown;
+                comboBox.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
+                comboBox.AutoCompleteSource = AutoCompleteSource.ListItems;
 
-                // Remove previous event handler to avoid duplicates
-                comboBox.SelectedIndexChanged -= ComboBox_SelectedIndexChanged;
+                comboBox.KeyDown -= ComboBox_KeyDown; // Prevent duplicate event handlers
+                comboBox.KeyDown += ComboBox_KeyDown;
+            }
+        }
 
-                // Update ComboBox items based on row index
-                comboBox.Items.Clear();
-                if (rowData.ContainsKey(rowIndex))
+        private void ComboBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                ComboBox comboBox = sender as ComboBox;
+                if (comboBox != null && !string.IsNullOrWhiteSpace(comboBox.Text))
                 {
-                    comboBox.Items.AddRange(rowData[rowIndex].ToArray());
-                }
+                    string newValue = comboBox.Text;
+                    int rowIndex = dataGridView1.CurrentCell.RowIndex;
+                    DataGridViewComboBoxCell comboBoxCell = (DataGridViewComboBoxCell)dataGridView1.Rows[rowIndex].Cells[1];
 
-                // Optionally, handle selection changes
-                comboBox.SelectedIndexChanged += ComboBox_SelectedIndexChanged;
+                    // ✅ Close drop-down before updating value
+                    comboBox.DroppedDown = false;
+
+                    // ✅ Add new value if not already in the list
+                    if (!comboBoxCell.Items.Contains(newValue))
+                    {
+                        comboBoxCell.Items.Add(newValue);
+                    }
+
+                    // ✅ Set the cell value immediately
+                    dataGridView1.Rows[rowIndex].Cells[1].Value = newValue;
+                    dataGridView1.RefreshEdit();
+
+                    // ✅ Prevent Enter from moving to another row
+                    e.SuppressKeyPress = true;
+                }
             }
         }
 
         private void DataGridView1_CellEnter(object sender, DataGridViewCellEventArgs e)
         {
-            // If entering a ComboBox cell, enter edit mode to show the dropdown immediately
             if (e.ColumnIndex == 1)
             {
                 dataGridView1.BeginEdit(true);
                 if (dataGridView1.EditingControl is ComboBox comboBox)
                 {
-                    comboBox.DroppedDown = true; // Open the dropdown instantly
+                    comboBox.DroppedDown = true;
                 }
             }
         }
 
-        private void ComboBox_SelectedIndexChanged(object sender, EventArgs e)
+        private void DataGridView1_CellValidating(object sender, DataGridViewCellValidatingEventArgs e)
         {
-            if (sender is ComboBox comboBox)
+            if (e.ColumnIndex == 1) // ComboBox Column
             {
-                Console.WriteLine("Selected: " + comboBox.SelectedItem);
+                string inputValue = e.FormattedValue.ToString();
+                int rowIndex = e.RowIndex;
+
+                if (!string.IsNullOrWhiteSpace(inputValue))
+                {
+                    DataGridViewComboBoxCell comboBoxCell = (DataGridViewComboBoxCell)dataGridView1.Rows[rowIndex].Cells[e.ColumnIndex];
+
+                    // If the new value is not in the ComboBox, add it
+                    if (!comboBoxCell.Items.Contains(inputValue))
+                    {
+                        comboBoxCell.Items.Add(inputValue);  // ✅ Add new value to ComboBox dropdown
+                        rowData[rowIndex].Add(inputValue);  // ✅ Store new value in data dictionary
+                    }
+
+                    // ✅ Ensure the new value is set and visible in the cell
+                    dataGridView1.Rows[rowIndex].Cells[e.ColumnIndex].Value = inputValue;
+
+                    // ✅ Refresh the DataGridView to show updates
+                    dataGridView1.RefreshEdit();
+                }
             }
         }
 
+
         private void DataGridView1_DataError(object sender, DataGridViewDataErrorEventArgs e)
         {
-            // Suppress default DataGridView error dialog
             e.ThrowException = false;
         }
-
 
     }
 }
